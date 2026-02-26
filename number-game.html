@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Number Crack - 脑洞大开</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap');
+        
+        body {
+            font-family: 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .digital-font {
+            font-family: 'JetBrains+Mono', monospace;
+        }
+
+        /* 背景过渡动画 */
+        #bg-layer {
+            transition: background-color 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 视觉压缩条样式 */
+        .compression-bar-container {
+            height: 80px;
+            background: rgba(0,0,0,0.2);
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.15);
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        /* 无效区域 - 机械警示纹理 */
+        .zone-excluded {
+            position: absolute;
+            height: 100%;
+            top: 0;
+            background: repeating-linear-gradient(
+                135deg,
+                #1a1a1a,
+                #1a1a1a 10px,
+                #2a2a2a 10px,
+                #2a2a2a 20px
+            );
+            transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 10;
+            border-right: 2px solid rgba(255,255,255,0.1); 
+            border-left: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        /* 被锁死的区域增加一种金属质感遮罩 */
+        .zone-excluded::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            box-shadow: inset 0 0 20px #000;
+        }
+
+        .active-marker {
+            position: absolute;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: #fff;
+            box-shadow: 0 0 15px rgba(255,255,255,0.8);
+            z-index: 20;
+            transform: translateX(-50%);
+            transition: left 0.1s linear;
+        }
+
+        /* 自定义滑块样式 */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 32px;
+            width: 32px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 4px solid rgba(0,0,0,0.1);
+            cursor: pointer;
+            margin-top: -14px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:active {
+            transform: scale(1.2);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: transparent;
+            border-radius: 3px;
+        }
+
+        /* 按钮点击态 */
+        .btn-press:active {
+            transform: scale(0.95);
+            background-color: rgba(255,255,255,0.2);
+        }
+
+        /* 胜利粒子动画容器 */
+        #particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* 状态提示标签 */
+        .status-badge {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease-out;
+        }
+        .status-badge.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 雷达发光特效 */
+        .egg-radar-weak {
+            filter: drop-shadow(0 0 10px rgba(168,85,247,0.5));
+            transition: all 0.3s;
+        }
+        .egg-radar-strong {
+            filter: drop-shadow(0 0 20px rgba(236,72,153,0.9));
+            animation: pulse-radar 0.8s ease-in-out infinite alternate;
+        }
+        @keyframes pulse-radar {
+            0% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(236,72,153,0.7)); }
+            100% { transform: scale(1.05); filter: drop-shadow(0 0 25px rgba(236,72,153,1)); }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen text-white flex flex-col relative bg-slate-900">
+
+    <!-- 背景颜色层 -->
+    <div id="bg-layer" class="absolute inset-0 z-0 bg-slate-800"></div>
+
+    <!-- 粒子层 -->
+    <canvas id="particles"></canvas>
+
+    <!-- 主界面 -->
+    <div class="relative z-10 flex flex-col h-full max-w-md mx-auto p-6 justify-between safe-area-inset-bottom">
+        
+        <!-- A. 题目区 -->
+        <header class="text-center mt-8 space-y-2">
+            <div class="inline-block px-3 py-1 rounded-full bg-black/20 text-xs font-bold tracking-widest text-white/60 mb-2">
+                DAILY CHALLENGE #042
+            </div>
+            <h1 class="text-2xl font-bold leading-tight">成年人全身通常有多少块骨头？</h1>
+            <div class="inline-block px-2 py-1 bg-white/10 rounded text-xs text-yellow-300 font-bold mb-1 border border-yellow-400/30">
+                <i class="fas fa-crosshairs mr-1"></i> 允许误差: ±5
+            </div>
+            
+            <p class="text-white/50 text-sm">范围: <span id="range-display">0 ~ 500</span></p>
+        </header>
+
+        <!-- B. 视觉反馈区 -->
+        <section class="flex-1 flex flex-col justify-center space-y-6">
+            <!-- 状态提示词 (Feedback Text) -->
+            <div id="feedback-container" class="h-8 flex justify-center items-center">
+                <span id="feedback-text" class="status-badge px-4 py-1 rounded bg-black/30 font-bold tracking-widder text-sm backdrop-blur-sm border border-white/10">
+                    <!-- JS动态填入: TOO LOW / TOO HIGH -->
+                </span>
+            </div>
+
+            <!-- 核心：视觉压缩条 -->
+            <div class="w-full relative">
+                <div class="flex justify-between text-xs text-white/40 mb-1 digital-font">
+                    <span id="global-min">0</span>
+                    <span id="global-max">500</span>
+                </div>
+                
+                <div class="compression-bar-container w-full" id="compression-bar">
+                    <!-- 左侧排除区 -->
+                    <div id="zone-left" class="zone-excluded left-0 w-0 border-r-2 border-white/20"></div>
+                    
+                    <!-- 右侧排除区 -->
+                    <div id="zone-right" class="zone-excluded right-0 w-0 border-l-2 border-white/20"></div>
+
+                    <!-- 当前选值锚点 -->
+                    <div id="active-marker" class="active-marker left-1/2"></div>
+                </div>
+
+                <!-- 当前数值大显示 -->
+                <div class="text-center mt-6">
+                    <span id="current-value" class="digital-font text-6xl font-bold text-white drop-shadow-lg">250</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- C. 操作区 -->
+        <footer class="pb-8 space-y-6">
+            <!-- 滑块 + 微调 -->
+            <div class="bg-black/20 backdrop-blur-md rounded-2xl p-4 border border-white/5">
+                <!-- 传感器指示器 & 彩蛋收集进度 -->
+                <div class="mb-4 px-2 flex flex-col gap-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] text-white/40 uppercase tracking-widest"><i class="fas fa-thermometer-half"></i> 主目标热感</span>
+                        <span id="radar-status" class="text-[10px] text-purple-300/30 font-bold uppercase tracking-widest transition-all duration-300"><i class="fas fa-satellite-dish"></i> 隐藏生物雷达</span>
+                    </div>
+                    <!-- 彩蛋进度 UI (移至此处，防误导并与雷达整合) -->
+                    <div id="egg-tracker" class="flex justify-end gap-2 transition-all duration-300">
+                        <div id="egg-cat" class="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center grayscale opacity-40 transition-all duration-500 border border-white/10"><i class="fas fa-question text-white/30 text-[10px]"></i></div>
+                        <div id="egg-baby" class="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center grayscale opacity-40 transition-all duration-500 border border-white/10"><i class="fas fa-question text-white/30 text-[10px]"></i></div>
+                        <div id="egg-dog" class="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center grayscale opacity-40 transition-all duration-500 border border-white/10"><i class="fas fa-question text-white/30 text-[10px]"></i></div>
+                    </div>
+                </div>
+
+                <!-- 滑块 -->
+                <div class="mb-6 px-2 relative">
+                    <input type="range" id="main-slider" min="0" max="500" value="250" step="1">
+                </div>
+
+                <!-- 微调按钮 -->
+                <div class="flex justify-between items-center gap-4">
+                    <button id="btn-minus" class="btn-press w-16 h-16 rounded-xl bg-white/10 flex items-center justify-center text-2xl hover:bg-white/20 transition-colors touch-manipulation">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                    
+                    <div class="text-xs text-white/40 uppercase tracking-widest text-center">
+                        Fine Tune<br>
+                        <span class="text-[10px] opacity-50">Hold for speed</span>
+                    </div>
+
+                    <button id="btn-plus" class="btn-press w-16 h-16 rounded-xl bg-white/10 flex items-center justify-center text-2xl hover:bg-white/20 transition-colors touch-manipulation">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 确认按钮 -->
+            <button id="btn-guess" class="btn-press w-full py-5 bg-white text-slate-900 rounded-xl font-black text-xl tracking-widest uppercase shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] transition-all flex items-center justify-center gap-2">
+                <i class="fas fa-fingerprint"></i> Guess
+            </button>
+        </footer>
+    </div>
+
+    <!-- 彩蛋发现 Toast -->
+    <div id="egg-toast" class="pointer-events-none fixed top-[25%] left-1/2 transform -translate-x-1/2 scale-0 opacity-0 bg-gradient-to-br from-purple-600/95 to-pink-600/95 backdrop-blur-md p-6 rounded-2xl shadow-[0_10px_40px_rgba(168,85,247,0.5)] z-50 transition-all duration-500 text-center border border-white/30 min-w-[280px]">
+        <div class="text-6xl mb-3 drop-shadow-lg" id="egg-toast-icon">🐱</div>
+        <div class="font-bold text-white text-xl tracking-wider mb-1" id="egg-toast-title">发现隐藏生物！</div>
+        <div class="text-sm text-purple-100 font-medium" id="egg-toast-desc">猫通常有230块骨头</div>
+    </div>
+
+    <!-- 胜利弹窗 -->
+    <div id="victory-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
+        <div class="bg-slate-800 border border-yellow-500/30 p-8 rounded-2xl text-center shadow-2xl transform transition-all scale-100 max-w-sm w-full">
+            <div class="text-6xl mb-4">🔓</div>
+            <h2 class="text-3xl font-bold text-white mb-2">CRACKED!</h2>
+            <p class="text-yellow-400 font-bold text-xl mb-4 digital-font" id="victory-number">ANSWER: 206</p>
+            
+            <div id="victory-desc-area">
+                <!-- 动态内容注入区 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 游戏配置 ---
+        const CONFIG = {
+            globalMin: 0,
+            globalMax: 500,
+            targetNumber: 206, // 演示固定值，实际可随机
+            tolerance: 5,      // 允许的误差范围 ±5
+            eggTolerance: 2,   // 彩蛋误差范围更严格，需要更精准的探索
+            easterEggs: [
+                { id: 'cat', value: 230, name: '猫咪', icon: '🐱', desc: '猫通常有 230 块骨头', found: false },
+                { id: 'baby', value: 300, name: '人类婴儿', icon: '👶', desc: '婴儿出生时约有 300 块骨头', found: false },
+                { id: 'dog', value: 319, name: '狗狗', icon: '🐶', desc: '狗通常有 319 块骨头', found: false }
+            ],
+            colors: {
+                cold: '#3b82f6',   // blue-500
+                warm: '#f97316',   // orange-500
+                hot: '#ef4444',    // red-500
+                neutral: '#1e293b' // slate-800
+            }
+        };
+
+        // --- 状态管理 ---
+        let state = {
+            currentMin: CONFIG.globalMin,
+            currentMax: CONFIG.globalMax,
+            currentVal: 250,
+            isVictory: false,
+            huntingMode: false // 寻蛋模式标记
+        };
+
+        // --- DOM 元素 ---
+        const els = {
+            bgLayer: document.getElementById('bg-layer'),
+            slider: document.getElementById('main-slider'),
+            valDisplay: document.getElementById('current-value'),
+            marker: document.getElementById('active-marker'),
+            zoneLeft: document.getElementById('zone-left'),
+            zoneRight: document.getElementById('zone-right'),
+            rangeDisplay: document.getElementById('range-display'),
+            feedbackBadge: document.getElementById('feedback-text'),
+            victoryModal: document.getElementById('victory-modal'),
+            victoryNum: document.getElementById('victory-number'),
+            btnGuess: document.getElementById('btn-guess'),
+            btnMinus: document.getElementById('btn-minus'),
+            btnPlus: document.getElementById('btn-plus'),
+            eggTracker: document.getElementById('egg-tracker'),
+            radarStatus: document.getElementById('radar-status')
+        };
+
+        // --- 初始化 ---
+        function init() {
+            // 随机生成一个目标值用于演示 (或者使用固定值测试)
+            // CONFIG.targetNumber = Math.floor(Math.random() * 501); 
+            
+            updateUI(false);
+            setupEvents();
+            setupStepper(els.btnMinus, -1);
+            setupStepper(els.btnPlus, 1);
+        }
+
+        // --- 核心逻辑：更新 UI ---
+        function updateUI(animateSlider = true) {
+            // 1. 更新文本显示
+            els.slider.value = state.currentVal;
+            els.valDisplay.textContent = state.currentVal;
+            els.rangeDisplay.textContent = `${state.currentMin} ~ ${state.currentMax}`;
+
+            const totalRange = CONFIG.globalMax - CONFIG.globalMin;
+            
+            // 1.5 渲染滑块轨道高亮 (允许全区域拖动，但高亮有效区域)
+            const activeLeftPct = ((state.currentMin - CONFIG.globalMin) / totalRange) * 100;
+            const activeRightPct = ((state.currentMax - CONFIG.globalMin) / totalRange) * 100;
+            
+            els.slider.style.background = `linear-gradient(to right, 
+                rgba(255,255,255,0.1) 0%, 
+                rgba(255,255,255,0.1) ${activeLeftPct}%, 
+                rgba(255,255,255,0.8) ${activeLeftPct}%, 
+                rgba(255,255,255,0.8) ${activeRightPct}%, 
+                rgba(255,255,255,0.1) ${activeRightPct}%, 
+                rgba(255,255,255,0.1) 100%)`;
+
+            // 2. 更新视觉压缩条 (Visual Compression)
+            // 计算左侧无效区宽度百分比
+            const leftPct = ((state.currentMin - CONFIG.globalMin) / totalRange) * 100;
+            // 计算右侧无效区宽度百分比
+            const rightPct = ((CONFIG.globalMax - state.currentMax) / totalRange) * 100;
+
+            els.zoneLeft.style.width = `${leftPct}%`;
+            els.zoneRight.style.width = `${rightPct}%`;
+
+            // 3. 更新锚点位置 (Marker)
+            // Marker 应该相对于整个容器定位
+            const markerPct = ((state.currentVal - CONFIG.globalMin) / totalRange) * 100;
+            els.marker.style.left = `${markerPct}%`;
+
+            // 4. 计算热度颜色 (Thermal Color)
+            if (!state.isVictory && !state.huntingMode) {
+                updateThermalColor();
+            }
+            
+            // 5. 更新彩蛋雷达探测器
+            updateEggRadar();
+        }
+
+        function updateThermalColor() {
+            if (state.huntingMode) return;
+            
+            // 计算到目标“边缘”的距离，而不是中心点
+            let dist = 0;
+            const targetMin = CONFIG.targetNumber - CONFIG.tolerance;
+            const targetMax = CONFIG.targetNumber + CONFIG.tolerance;
+            
+            if (state.currentVal < targetMin) {
+                dist = targetMin - state.currentVal;
+            } else if (state.currentVal > targetMax) {
+                dist = state.currentVal - targetMax;
+            }
+
+            const maxDist = CONFIG.globalMax - CONFIG.globalMin;
+            const ratio = dist / maxDist; // 0 (撞墙) ~ 1 (最远) - 实际最大约 0.5-1.0
+            
+            // 简单阈值逻辑
+            let color = CONFIG.colors.neutral;
+            if (ratio > 0.4) {
+                color = '#1e293b'; // 远: 深蓝灰
+            } else if (ratio > 0.15) {
+                color = '#1e3a8a'; // 较远: 蓝
+            } else if (ratio > 0.05) {
+                color = '#c2410c'; // 近: 橙
+            } else {
+                color = '#7f1d1d'; // 极近: 深红
+            }
+            
+            els.bgLayer.style.backgroundColor = color;
+        }
+
+        // --- 新增：彩蛋雷达系统 ---
+        function updateEggRadar() {
+            if (state.huntingMode) return; // 寻蛋模式下雷达全开，无需渐进提示
+
+            const unfoundEggs = CONFIG.easterEggs.filter(e => !e.found);
+            if (unfoundEggs.length === 0) {
+                els.radarStatus.innerHTML = '<i class="fas fa-check"></i> 记录已全收集';
+                els.radarStatus.className = 'text-[10px] font-bold uppercase tracking-widest text-green-400/50 transition-all duration-300';
+                els.eggTracker.classList.remove('egg-radar-weak', 'egg-radar-strong');
+                return;
+            }
+
+            // 计算距离最近的未发现彩蛋的距离
+            let minDist = Math.min(...unfoundEggs.map(e => Math.abs(state.currentVal - e.value)));
+
+            if (minDist <= 10) {
+                // 极度接近 (强雷达)
+                els.radarStatus.innerHTML = '<i class="fas fa-broadcast-tower animate-pulse"></i> 发现异常生物信号！';
+                els.radarStatus.className = 'text-[10px] font-bold uppercase tracking-widest text-pink-400 drop-shadow-[0_0_8px_rgba(244,114,182,0.8)] transition-all duration-300 animate-pulse';
+                els.eggTracker.classList.remove('egg-radar-weak');
+                els.eggTracker.classList.add('egg-radar-strong');
+            } else if (minDist <= 40) {
+                // 附近有信号 (弱雷达)
+                els.radarStatus.innerHTML = '<i class="fas fa-satellite-dish"></i> 探测到微弱生物波...';
+                els.radarStatus.className = 'text-[10px] font-bold uppercase tracking-widest text-purple-400 drop-shadow-[0_0_5px_rgba(192,132,252,0.5)] transition-all duration-300';
+                els.eggTracker.classList.remove('egg-radar-strong');
+                els.eggTracker.classList.add('egg-radar-weak');
+            } else {
+                // 无信号
+                els.radarStatus.innerHTML = '<i class="fas fa-satellite-dish"></i> 隐藏生物雷达';
+                els.radarStatus.className = 'text-[10px] font-bold uppercase tracking-widest text-purple-300/30 transition-all duration-300';
+                els.eggTracker.classList.remove('egg-radar-weak', 'egg-radar-strong');
+            }
+        }
+
+        // --- 核心逻辑：猜测判定 ---
+        function handleGuess() {
+            const guess = parseInt(state.currentVal);
+            const target = CONFIG.targetNumber;
+            const tol = CONFIG.tolerance;
+
+            // 1. 检查是否触发彩蛋
+            let foundNewEgg = false;
+            CONFIG.easterEggs.forEach(egg => {
+                if (!egg.found && Math.abs(guess - egg.value) <= CONFIG.eggTolerance) {
+                    egg.found = true;
+                    foundNewEgg = true;
+                    showEggToast(egg);
+                    updateEggUI(egg);
+                }
+            });
+
+            // 寻蛋模式下：只找彩蛋，不管主线
+            if (state.huntingMode) {
+                if (!foundNewEgg) {
+                    showFeedback('<i class="fas fa-times-circle mr-1"></i> 未锁定生物，请根据雷达指示移动', 'text-red-300');
+                    document.body.classList.add('shake');
+                    setTimeout(() => document.body.classList.remove('shake'), 500);
+                }
+                
+                // 检查是否全收集
+                if (CONFIG.easterEggs.every(e => e.found)) {
+                    setTimeout(() => showAllEggsFound(), foundNewEgg ? 2000 : 0);
+                }
+                return; // 终止函数，不执行后续主线逻辑
+            }
+
+            // 1.5 判断是否在无效区域乱猜
+            if (!foundNewEgg && (guess < state.currentMin || guess > state.currentMax)) {
+                showFeedback('<i class="fas fa-ban mr-2"></i> 该区域已被排除，未发现生物', 'text-gray-400');
+                document.body.classList.add('shake');
+                setTimeout(() => document.body.classList.remove('shake'), 500);
+                return; // 在废弃区域没扫到彩蛋，直接返回，不影响主线进度
+            }
+
+            // 2. 主线逻辑检查 (是否落入允许的误差区间内)
+            if (Math.abs(guess - target) <= tol) {
+                // 如果刚好既找到了彩蛋又通关主线，给彩蛋动画留点时间
+                setTimeout(() => victory(), foundNewEgg ? 1500 : 0);
+            } else {
+                // 错误反馈
+                let msg = "";
+                let icon = "";
+                
+                if (guess < target - tol) {
+                    msg = "TOO LOW / 太小了";
+                    icon = '<i class="fas fa-arrow-up mr-2"></i>';
+                    // 确保最小值只能增加，防止反弹
+                    state.currentMin = Math.max(state.currentMin, Math.min(guess + 1, target + tol)); 
+                } else {
+                    msg = "TOO HIGH / 太大了";
+                    icon = '<i class="fas fa-arrow-down mr-2"></i>';
+                    // 确保最大值只能减小，防止反弹
+                    state.currentMax = Math.min(state.currentMax, Math.max(guess - 1, target - tol));
+                }
+
+                // 如果没找到彩蛋，才显示主线错误反馈，防止覆盖彩蛋的喜悦
+                if (!foundNewEgg) {
+                    showFeedback(icon + msg, guess < target ? 'text-blue-300' : 'text-orange-300');
+                }
+                
+                document.body.classList.add('shake');
+                setTimeout(() => document.body.classList.remove('shake'), 500);
+
+                updateUI();
+            }
+        }
+
+        function showFeedback(html, colorClass) {
+            const el = els.feedbackBadge;
+            el.innerHTML = html;
+            el.className = `status-badge px-4 py-1 rounded bg-black/50 font-bold tracking-widest text-sm backdrop-blur-sm border border-white/20 show ${colorClass}`;
+            
+            // 2秒后淡出，除非有新的
+            if (window.feedbackTimer) clearTimeout(window.feedbackTimer);
+            window.feedbackTimer = setTimeout(() => {
+                if (!state.huntingMode) {
+                    el.classList.remove('show');
+                } else {
+                    // 寻蛋模式下不隐藏，恢复实时雷达指示
+                    handleHuntingRadar(state.currentVal);
+                }
+            }, 2000);
+        }
+
+        function victory() {
+            state.isVictory = true;
+            els.bgLayer.style.backgroundColor = '#10b981'; // Success Green
+            
+            els.victoryNum.innerHTML = `答案: ${CONFIG.targetNumber}<br><span class="text-sm text-yellow-100 block mt-2 opacity-80 font-normal">你的猜测: ${state.currentVal} (误差在 ±${CONFIG.tolerance} 内)</span>`;
+            
+            // 构建彩蛋状态相关的描述和按钮
+            const foundCount = CONFIG.easterEggs.filter(e => e.found).length;
+            const totalEggs = CONFIG.easterEggs.length;
+            const descArea = document.getElementById('victory-desc-area');
+            
+            let contentHtml = '';
+            if (foundCount === totalEggs) {
+                contentHtml = `
+                    <p class="text-white/70 mb-4">破解成功！击败了全球 85% 的玩家。</p>
+                    <div class="bg-purple-900/40 border border-purple-500/30 rounded-lg p-3 mb-6">
+                        <p class="text-purple-300 font-bold text-sm">✨ 大满贯达成！</p>
+                        <p class="text-purple-200/70 text-xs mt-1">你找齐了所有隐藏的生物骨骼记录！</p>
+                    </div>
+                    <button onclick="location.reload()" class="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-lg rounded-xl transition-colors shadow-lg">下一题</button>
+                `;
+            } else {
+                contentHtml = `
+                    <p class="text-white/70 mb-4">破解成功！击败了全球 85% 的玩家。</p>
+                    <div class="bg-black/30 rounded-lg p-3 mb-6 text-sm">
+                        <span class="text-yellow-400 font-bold">提示:</span> 题库中还隐藏着 <strong class="text-purple-400 text-lg">${totalEggs - foundCount}</strong> 个其他生物的骨头数量未被发现...
+                    </div>
+                    <button onclick="continueHunting()" class="w-full py-4 mb-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-lg rounded-xl transition-all shadow-[0_0_20px_rgba(168,85,247,0.4)] border border-purple-400/50 flex justify-center items-center gap-2">
+                        <i class="fas fa-radar"></i> 继续寻找彩蛋
+                    </button>
+                    <div class="flex gap-3">
+                        <button onclick="revealAllEggs()" class="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white/90 font-bold rounded-xl transition-colors text-sm flex justify-center items-center gap-2 border border-white/10">
+                            <i class="fas fa-eye text-white/50"></i> 看答案
+                        </button>
+                        <button onclick="location.reload()" class="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white/60 font-bold rounded-xl transition-colors text-sm">下一题</button>
+                    </div>
+                `;
+            }
+            
+            descArea.innerHTML = contentHtml;
+            els.victoryModal.classList.remove('hidden');
+            fireParticles('#10b981'); // 绿色粒子
+        }
+
+        // --- 彩蛋扩展逻辑 ---
+        function continueHunting() {
+            els.victoryModal.classList.add('hidden');
+            state.huntingMode = true;
+            state.isVictory = false; // 解除胜利背景锁定
+            
+            // 完全解开范围限制，允许全图扫描
+            state.currentMin = CONFIG.globalMin;
+            state.currentMax = CONFIG.globalMax;
+            
+            // 重置视觉条
+            els.zoneLeft.style.width = '0%';
+            els.zoneRight.style.width = '0%';
+            els.bgLayer.style.backgroundColor = '#1e293b'; // 变回中性色
+            
+            // 改变主按钮样式
+            els.btnGuess.innerHTML = '<i class="fas fa-search"></i> SCAN EGGS';
+            els.btnGuess.className = "btn-press w-full py-5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-black text-xl tracking-widest uppercase shadow-[0_0_20px_rgba(168,85,247,0.5)] transition-all flex items-center justify-center gap-2";
+            
+            // 增加“放弃寻找，查看答案”按钮在 footer
+            const footer = document.querySelector('footer');
+            if (!document.getElementById('btn-giveup-hunting')) {
+                const giveUpBtn = document.createElement('button');
+                giveUpBtn.id = 'btn-giveup-hunting';
+                giveUpBtn.className = "w-full mt-4 py-3 bg-transparent text-white/40 hover:text-white/80 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2";
+                giveUpBtn.innerHTML = '<i class="fas fa-eye"></i> 找不到？直接看答案';
+                giveUpBtn.onclick = revealAllEggs;
+                footer.appendChild(giveUpBtn);
+            }
+
+            updateUI();
+            handleHuntingRadar(state.currentVal); // 立即触发寻蛋雷达显示
+        }
+
+        function revealAllEggs() {
+            // 渲染并揭示所有未发现的彩蛋
+            CONFIG.easterEggs.forEach(egg => {
+                updateEggUI(egg); // Reveal the icons at the top
+            });
+
+            els.victoryNum.innerHTML = `彩蛋已揭晓`;
+            
+            const descArea = document.getElementById('victory-desc-area');
+            
+            let detailsHtml = CONFIG.easterEggs.map(e => {
+                const statusColor = e.found ? 'text-green-400' : 'text-purple-300';
+                const statusIcon = e.found ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-eye"></i>';
+                return `
+                <div class="flex justify-between items-center bg-black/40 p-3 rounded-lg mb-2 text-sm border border-white/5">
+                    <span class="flex items-center gap-2"><span class="text-xl">${e.icon}</span> ${e.name}</span>
+                    <div class="flex items-center gap-3">
+                        <span class="font-bold ${statusColor} digital-font text-lg">${e.value}</span>
+                        <span class="text-xs ${statusColor} opacity-70">${statusIcon}</span>
+                    </div>
+                </div>`;
+            }).join('');
+
+            descArea.innerHTML = `
+                <div class="mb-6 mt-4 text-left">
+                    ${detailsHtml}
+                </div>
+                <button onclick="location.reload()" class="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-lg rounded-xl transition-colors shadow-lg">进入下一题</button>
+            `;
+
+            els.bgLayer.style.backgroundColor = '#1e293b'; 
+            els.victoryModal.classList.remove('hidden');
+
+            // 隐藏底部可能存在的放弃按钮
+            const btn = document.getElementById('btn-giveup-hunting');
+            if(btn) btn.style.display = 'none';
+        }
+
+        // --- 寻蛋模式雷达增强指引 (Geiger Counter) ---
+        function handleHuntingRadar(val) {
+            if (!state.huntingMode) return;
+            const unfoundEggs = CONFIG.easterEggs.filter(e => !e.found);
+            if (unfoundEggs.length === 0) return;
+
+            // 寻找最近的彩蛋
+            let closestEgg = unfoundEggs.reduce((prev, curr) =>
+                Math.abs(val - curr.value) < Math.abs(val - prev.value) ? curr : prev
+            );
+            let dist = Math.abs(val - closestEgg.value);
+
+            const el = els.feedbackBadge;
+            if (window.feedbackTimer) clearTimeout(window.feedbackTimer); // 阻止 auto-hide
+
+            if (dist <= CONFIG.eggTolerance) {
+                el.innerHTML = `<i class="fas fa-bullseye animate-ping mr-2"></i> 锁定目标！点击 GUESS！`;
+                el.className = `status-badge px-4 py-1 rounded bg-pink-600 font-bold tracking-widest text-sm backdrop-blur-sm border border-pink-400 show text-white shadow-[0_0_15px_rgba(236,72,153,0.8)]`;
+            } else if (dist <= 20) {
+                let dir = val < closestEgg.value ? '增加数值 <i class="fas fa-chevron-right"></i>' : '<i class="fas fa-chevron-left"></i> 减小数值';
+                el.innerHTML = `<i class="fas fa-signal text-pink-300 mr-1"></i> 强信号！${dir}`;
+                el.className = `status-badge px-4 py-1 rounded bg-purple-600/90 font-bold tracking-widest text-sm backdrop-blur-sm border border-purple-400 show text-white`;
+            } else if (dist <= 60) {
+                let dir = val < closestEgg.value ? '向右 <i class="fas fa-arrow-right"></i>' : '<i class="fas fa-arrow-left"></i> 向左';
+                el.innerHTML = `<i class="fas fa-satellite-dish mr-1"></i> 发现微弱波段... ${dir}`;
+                el.className = `status-badge px-4 py-1 rounded bg-purple-900/80 font-bold tracking-widest text-sm backdrop-blur-sm border border-purple-500/50 show text-purple-200`;
+            } else {
+                el.innerHTML = `<i class="fas fa-search mr-1"></i> 正在进行全频段扫描...`;
+                el.className = `status-badge px-4 py-1 rounded bg-black/50 font-bold tracking-widest text-sm backdrop-blur-sm border border-white/20 show text-gray-400`;
+            }
+        }
+
+        function showEggToast(egg) {
+            const toast = document.getElementById('egg-toast');
+            document.getElementById('egg-toast-icon').textContent = egg.icon;
+            document.getElementById('egg-toast-desc').textContent = egg.desc;
+            
+            // 弹出动画
+            toast.classList.remove('scale-0', 'opacity-0');
+            toast.classList.add('scale-100', 'opacity-100', 'translate-y-[-20px]');
+            
+            // 震动
+            document.body.classList.add('shake');
+            setTimeout(() => document.body.classList.remove('shake'), 500);
+            
+            // 紫色粒子庆祝
+            fireParticles('#a855f7', 50); 
+            
+            // 3秒后收起
+            setTimeout(() => {
+                toast.classList.remove('scale-100', 'opacity-100', 'translate-y-[-20px]');
+                toast.classList.add('scale-0', 'opacity-0');
+            }, 3000);
+        }
+
+        function updateEggUI(egg) {
+            const el = document.getElementById(`egg-${egg.id}`);
+            if(el) {
+                el.classList.remove('grayscale', 'opacity-40', 'bg-black/40', 'border-white/10');
+                el.classList.add('bg-purple-500/30', 'border-purple-400', 'shadow-[0_0_15px_rgba(168,85,247,0.6)]');
+                el.innerHTML = `<span class="text-xl">${egg.icon}</span>`;
+            }
+        }
+
+        function showAllEggsFound() {
+            els.victoryNum.innerHTML = `彩蛋全收集！<br><span class="text-sm text-purple-200 block mt-2 opacity-80 font-normal">你是一位伟大的生物学家</span>`;
+            
+            const descArea = document.getElementById('victory-desc-area');
+            descArea.innerHTML = `
+                <div class="flex justify-center gap-4 text-4xl mb-6 mt-4">🐱 👶 🐶</div>
+                <button onclick="location.reload()" class="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-lg rounded-xl transition-colors shadow-lg">进入下一题</button>
+            `;
+            
+            els.bgLayer.style.backgroundColor = '#4c1d95'; // 深紫色背景
+            els.victoryModal.classList.remove('hidden');
+            fireParticles('#eab308', 150); // 金色大爆发
+        }
+
+        // --- 事件监听 ---
+        function setupEvents() {
+            // 滑块拖动
+            els.slider.addEventListener('input', (e) => {
+                state.currentVal = parseInt(e.target.value);
+                // 实时更新UI但不改变范围
+                const totalRange = CONFIG.globalMax - CONFIG.globalMin;
+                const markerPct = ((state.currentVal - CONFIG.globalMin) / totalRange) * 100;
+                els.marker.style.left = `${markerPct}%`;
+                els.valDisplay.textContent = state.currentVal;
+                
+                if (!state.isVictory && !state.huntingMode) {
+                    updateThermalColor(); // 拖动时主线热度反馈
+                }
+                updateEggRadar(); // 拖动时彩蛋雷达反馈
+
+                // 寻蛋模式下的强力指引反馈
+                if (state.huntingMode) {
+                    handleHuntingRadar(state.currentVal);
+                }
+            });
+
+            // 猜测按钮
+            els.btnGuess.addEventListener('click', handleGuess);
+        }
+
+        // --- 长按微调逻辑 ---
+        function setupStepper(btn, change) {
+            let interval;
+            let timeout;
+            let speed = 200; // 初始速度
+
+            const update = () => {
+                let newVal = state.currentVal + change;
+                // 解除微调按钮的局部范围限制，允许在全图 0-500 探索彩蛋
+                if (newVal >= CONFIG.globalMin && newVal <= CONFIG.globalMax) {
+                    state.currentVal = newVal;
+                    // 手动触发滑块更新
+                    els.slider.value = state.currentVal;
+                    els.slider.dispatchEvent(new Event('input'));
+                }
+            };
+
+            const start = (e) => {
+                e.preventDefault(); // 防止移动端长按选中文本
+                update(); // 点击立即触发一次
+                timeout = setTimeout(() => {
+                    speed = 100;
+                    interval = setInterval(() => {
+                        update();
+                        // 加速逻辑
+                        if (speed > 20) {
+                            speed -= 10;
+                            clearInterval(interval);
+                            interval = setInterval(update, speed);
+                        }
+                    }, speed);
+                }, 400); // 400ms 后开始连发
+            };
+
+            const stop = () => {
+                clearTimeout(timeout);
+                clearInterval(interval);
+                speed = 200;
+            };
+
+            // 鼠标
+            btn.addEventListener('mousedown', start);
+            btn.addEventListener('mouseup', stop);
+            btn.addEventListener('mouseleave', stop);
+            // 触摸
+            btn.addEventListener('touchstart', start, {passive: false});
+            btn.addEventListener('touchend', stop);
+        }
+
+        // --- 简单粒子系统 ---
+        function fireParticles(baseColor = null, count = 100) {
+            const canvas = document.getElementById('particles');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const particles = [];
+            for (let i = 0; i < count; i++) {
+                // 如果没有提供 baseColor，就用彩色的，如果提供了，就用提供颜色的变种
+                let pColor = `hsl(${Math.random() * 60 + 40}, 100%, 50%)`; // Default Gold
+                
+                if (baseColor === '#10b981') { // 绿
+                    pColor = `hsl(${Math.random() * 40 + 130}, 100%, 60%)`;
+                } else if (baseColor === '#a855f7') { // 紫
+                    pColor = `hsl(${Math.random() * 40 + 260}, 100%, 70%)`;
+                } else if (baseColor === '#eab308') { // 纯金
+                    pColor = `hsl(${Math.random() * 30 + 40}, 100%, 60%)`;
+                }
+
+                particles.push({
+                    x: canvas.width / 2,
+                    y: canvas.height / 2,
+                    vx: (Math.random() - 0.5) * 15,
+                    vy: (Math.random() - 0.5) * 15,
+                    life: 1,
+                    color: pColor
+                });
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                let active = false;
+                particles.forEach(p => {
+                    if (p.life > 0) {
+                        active = true;
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.vy += 0.2; // Gravity
+                        p.life -= 0.02;
+                        ctx.globalAlpha = p.life;
+                        ctx.fillStyle = p.color;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+                if (active) requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        // 启动
+        init();
+
+    </script>
+</body>
+</html>
